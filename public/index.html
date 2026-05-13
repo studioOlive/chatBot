@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Studio Olive — Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: linear-gradient(135deg, #fdf0f5 0%, #f5f0eb 50%, #fdf4e7 100%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+      }
+
+      #chat-container {
+        width: 420px;
+        height: 640px;
+        background: #fff;
+        border-radius: 24px;
+        box-shadow: 0 12px 48px rgba(220, 50, 120, 0.12), 0 4px 16px rgba(0,0,0,0.08);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        border: 1px solid rgba(220, 50, 120, 0.08);
+      }
+
+      header {
+        background: #e91e78;
+        color: #fff;
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      header::after {
+        content: '✨';
+        position: absolute;
+        right: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 20px;
+        opacity: 0.6;
+      }
+
+      header .avatar {
+        height: 42px;
+        width: auto;
+        border-radius: 10px;
+        object-fit: contain;
+        border: 2px solid rgba(233, 30, 120, 0.4);
+      }
+
+      header h1 {
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+        color: #fff;
+      }
+
+      header p {
+        font-size: 11.5px;
+        color: rgba(255,255,255,0.85);
+        margin-top: 2px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+
+      /* Online indicator dot */
+      .status-dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        background: #fff;
+        border-radius: 50%;
+        margin-right: 4px;
+        animation: pulse 2s infinite;
+        vertical-align: middle;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.6; transform: scale(0.85); }
+      }
+
+      #messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 18px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background: #fdfcfb;
+      }
+
+      #messages::-webkit-scrollbar { width: 4px; }
+      #messages::-webkit-scrollbar-track { background: transparent; }
+      #messages::-webkit-scrollbar-thumb { background: #e8d5de; border-radius: 4px; }
+
+      .message {
+        max-width: 82%;
+        padding: 11px 15px;
+        border-radius: 18px;
+        font-size: 14px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        font-weight: 500;
+        animation: popIn 0.2s ease;
+      }
+
+      @keyframes popIn {
+        from { opacity: 0; transform: translateY(6px) scale(0.97); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      .message.user {
+        align-self: flex-end;
+        background: #e91e78;
+        color: #fff;
+        border-bottom-right-radius: 5px;
+      }
+
+      .message.assistant {
+        align-self: flex-start;
+        background: #fff;
+        color: #1e1b18;
+        border-bottom-left-radius: 5px;
+        border: 1.5px solid #f0e8ed;
+        box-shadow: 0 2px 8px rgba(220, 50, 120, 0.06);
+      }
+
+      .message.assistant.thinking {
+        border-color: #f5eef2;
+        padding: 12px 16px;
+      }
+
+      /* Spinner loader */
+      .spinner {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .spinner-ring {
+        width: 18px;
+        height: 18px;
+        border: 2.5px solid #f0dce8;
+        border-top-color: #e91e78;
+        border-radius: 50%;
+        animation: spin 0.75s linear infinite;
+        flex-shrink: 0;
+      }
+
+      .spinner-label {
+        font-size: 13px;
+        color: #c07090;
+        font-style: italic;
+        font-weight: 600;
+        animation: fadeLabel 1.6s ease-in-out infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+
+      @keyframes fadeLabel {
+        0%, 100% { opacity: 0.5; }
+        50%       { opacity: 1; }
+      }
+
+      #input-area {
+        padding: 12px 14px;
+        border-top: 1.5px solid #f5edf2;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        background: #fff;
+      }
+
+      #input {
+        flex: 1;
+        border: 1.5px solid #edd5e4;
+        border-radius: 22px;
+        padding: 10px 16px;
+        font-size: 14px;
+        font-family: 'Nunito', sans-serif;
+        font-weight: 500;
+        outline: none;
+        background: #fdf8fb;
+        color: #1e1b18;
+        transition: border-color 0.2s, box-shadow 0.2s;
+      }
+
+      #input::placeholder { color: #c4a0b4; }
+
+      #input:focus {
+        border-color: #e91e78;
+        box-shadow: 0 0 0 3px rgba(233, 30, 120, 0.1);
+        background: #fff;
+      }
+
+      #send {
+        background: #e91e78;
+        color: #fff;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        cursor: pointer;
+        font-size: 17px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+        box-shadow: 0 3px 12px rgba(233, 30, 120, 0.35);
+      }
+
+      #send:hover {
+        background: #c9185a;
+        transform: scale(1.07);
+        box-shadow: 0 4px 16px rgba(233, 30, 120, 0.45);
+      }
+
+      #send:active { transform: scale(0.96); }
+      #send:disabled {
+        background: #e0c8d4;
+        box-shadow: none;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      /* Clickable links in assistant messages */
+      .message.assistant a {
+        color: #e91e78;
+        font-weight: 700;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        word-break: break-all;
+      }
+
+      .message.assistant a:hover { color: #c9185a; }
+
+      /* Welcome banner inside chat */
+      .welcome-banner {
+        background: linear-gradient(135deg, #fff0f7 0%, #fff8f0 100%);
+        border: 1.5px solid #f5d5e8;
+        border-radius: 16px;
+        padding: 14px 16px;
+        text-align: center;
+        font-size: 13px;
+        color: #7a4060;
+        line-height: 1.55;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .welcome-banner .sparkle { font-size: 22px; display: block; margin-bottom: 6px; }
+    </style>
+  </head>
+  <body>
+    <div id="chat-container">
+      <header>
+        <img class="avatar" src="/public/logo.jpg" alt="Studio Olive" />
+        <div>
+          <h1>Studio Olive Assistant</h1>
+          <p><span class="status-dot"></span>Here to help you find your magic</p>
+        </div>
+      </header>
+
+      <div id="messages">
+        <div class="welcome-banner">
+          <span class="sparkle">✨</span>
+          Welcome to Studio Olive! Ask me about our bags, accessories, shipping, returns, or anything else — I'm here to help!
+        </div>
+      </div>
+
+      <div id="input-area">
+        <input id="input" type="text" placeholder="Ask a question..." autocomplete="off" />
+        <button id="send">&#8593;</button>
+      </div>
+    </div>
+
+    <script>
+      const messagesEl = document.getElementById("messages");
+      const inputEl    = document.getElementById("input");
+      const sendBtn    = document.getElementById("send");
+
+      // Conversation history sent to the server
+      const history = [];
+
+      function linkify(text) {
+        // Escape HTML
+        const escaped = text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        // Convert markdown links [label](url) first
+        const withMarkdown = escaped.replace(
+          /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+          '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+        );
+        // Then convert bare URLs
+        return withMarkdown.replace(
+          /(?<!\bhref=["'])(?<![">])(https?:\/\/[^\s<)]+)/g,
+          '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+        );
+      }
+
+      function appendMessage(role, text) {
+        const div = document.createElement("div");
+        div.className = `message ${role}`;
+        if (role === "assistant" && text) {
+          div.innerHTML = linkify(text);
+        } else {
+          div.textContent = text;
+        }
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        return div;
+      }
+
+      async function sendMessage() {
+        const text = inputEl.value.trim();
+        if (!text) return;
+
+        inputEl.value = "";
+        sendBtn.disabled = true;
+
+        appendMessage("user", text);
+        history.push({ role: "user", content: text });
+
+        // Placeholder bubble with spinner
+        const assistantBubble = document.createElement("div");
+        assistantBubble.className = "message assistant thinking";
+        assistantBubble.innerHTML = `<div class="spinner"><div class="spinner-ring"></div><span class="spinner-label">Finding that for you…</span></div>`;
+        messagesEl.appendChild(assistantBubble);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+
+        try {
+          const res = await fetch("/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ messages: history }),
+          });
+
+          if (!res.ok) throw new Error(`Server error ${res.status}`);
+
+          const reader  = res.body.getReader();
+          const decoder = new TextDecoder();
+          let fullText  = "";
+
+          assistantBubble.classList.remove("thinking");
+          assistantBubble.innerHTML = "";
+          assistantBubble.textContent = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            // Plain text stream — append each chunk directly
+            const chunk = decoder.decode(value, { stream: true });
+            fullText += chunk;
+            assistantBubble.innerHTML = linkify(fullText);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+
+          history.push({ role: "assistant", content: fullText });
+        } catch (err) {
+          assistantBubble.innerHTML = "";
+          assistantBubble.textContent = "Sorry, something went wrong. Please try again!";
+          assistantBubble.classList.remove("thinking");
+          console.error(err);
+        }
+
+        sendBtn.disabled = false;
+        inputEl.focus();
+      }
+
+      sendBtn.addEventListener("click", sendMessage);
+      inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+      });
+    </script>
+  </body>
+</html>
