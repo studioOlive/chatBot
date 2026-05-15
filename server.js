@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
-import { serveStatic } from "@hono/node-server/serve-static";
 import { streamText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 
@@ -128,8 +127,7 @@ app.use("/chat", cors({
   allowHeaders: ["Content-Type"],
 }));
 
-app.use("/", serveStatic({ path: "./public/index.html" }));
-app.use("/public/*", serveStatic({ root: "./" }));
+app.get("/", (c) => c.text("OK"));
 
 async function sendEscalationEmail(customerQuestion, customerEmail) {
   const apiKey = process.env.RESEND_API_KEY;
