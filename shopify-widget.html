@@ -1,0 +1,364 @@
+<!-- Studio Olive Chat Widget -->
+<!-- Paste this just before the closing </body> tag in your Shopify theme.liquid file -->
+<script>
+(function () {
+  const RAILWAY_URL = "https://chatbot-production-d2ce.up.railway.app";
+
+  // ── Styles ──────────────────────────────────────────────────────────────
+  const style = document.createElement("style");
+  style.textContent = `
+    @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
+
+    #so-chat-bubble {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 58px;
+      height: 58px;
+      background: #e91e78;
+      border-radius: 50%;
+      box-shadow: 0 4px 18px rgba(233,30,120,0.45);
+      cursor: pointer;
+      z-index: 99998;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: none;
+    }
+    #so-chat-bubble:hover {
+      transform: scale(1.08);
+      box-shadow: 0 6px 24px rgba(233,30,120,0.55);
+    }
+    #so-chat-bubble svg { width: 26px; height: 26px; fill: #fff; }
+
+    #so-chat-window {
+      position: fixed;
+      bottom: 96px;
+      right: 24px;
+      width: 370px;
+      height: 560px;
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 12px 48px rgba(220,50,120,0.15), 0 4px 16px rgba(0,0,0,0.1);
+      z-index: 99999;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      font-family: 'Nunito', sans-serif;
+      border: 1px solid rgba(220,50,120,0.08);
+      animation: so-slideUp 0.25s ease;
+    }
+    #so-chat-window.open { display: flex; }
+
+    @keyframes so-slideUp {
+      from { opacity: 0; transform: translateY(16px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    #so-chat-header {
+      background: #e91e78;
+      color: #fff;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: relative;
+      flex-shrink: 0;
+    }
+    #so-chat-header::after {
+      content: '✨';
+      position: absolute;
+      right: 40px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 18px;
+      opacity: 0.6;
+    }
+    #so-close-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.8);
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 2px 4px;
+    }
+    #so-close-btn:hover { color: #fff; }
+    #so-header-logo {
+      height: 36px;
+      width: auto;
+      border-radius: 8px;
+      object-fit: contain;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+    #so-chat-header h2 {
+      font-size: 14px;
+      font-weight: 800;
+      margin: 0;
+      color: #fff;
+    }
+    #so-chat-header p {
+      font-size: 11px;
+      color: rgba(255,255,255,0.85);
+      margin: 2px 0 0;
+      font-weight: 600;
+    }
+    .so-status-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      background: #fff;
+      border-radius: 50%;
+      margin-right: 4px;
+      animation: so-pulse 2s infinite;
+      vertical-align: middle;
+    }
+    @keyframes so-pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:0.6; transform:scale(0.85); }
+    }
+
+    #so-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      background: #fdfcfb;
+    }
+    #so-messages::-webkit-scrollbar { width: 3px; }
+    #so-messages::-webkit-scrollbar-thumb { background: #e8d5de; border-radius: 3px; }
+
+    .so-welcome {
+      background: linear-gradient(135deg,#fff0f7 0%,#fff8f0 100%);
+      border: 1.5px solid #f5d5e8;
+      border-radius: 14px;
+      padding: 12px 14px;
+      text-align: center;
+      font-size: 12.5px;
+      color: #7a4060;
+      line-height: 1.5;
+      font-weight: 600;
+    }
+    .so-welcome .so-spark { font-size: 20px; display: block; margin-bottom: 5px; }
+
+    .so-msg {
+      max-width: 83%;
+      padding: 10px 13px;
+      border-radius: 16px;
+      font-size: 13.5px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      font-weight: 500;
+      animation: so-pop 0.2s ease;
+    }
+    @keyframes so-pop {
+      from { opacity:0; transform:translateY(5px) scale(0.97); }
+      to   { opacity:1; transform:translateY(0) scale(1); }
+    }
+    .so-msg.user {
+      align-self: flex-end;
+      background: #e91e78;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+    .so-msg.assistant {
+      align-self: flex-start;
+      background: #fff;
+      color: #1e1b18;
+      border-bottom-left-radius: 4px;
+      border: 1.5px solid #f0e8ed;
+      box-shadow: 0 2px 8px rgba(220,50,120,0.06);
+    }
+    .so-msg.assistant a { color:#e91e78; font-weight:700; word-break:break-all; }
+
+    .so-spinner {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .so-ring {
+      width: 16px; height: 16px;
+      border: 2.5px solid #f0dce8;
+      border-top-color: #e91e78;
+      border-radius: 50%;
+      animation: so-spin 0.75s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes so-spin { to { transform: rotate(360deg); } }
+    .so-spin-label {
+      font-size: 12px;
+      color: #c07090;
+      font-style: italic;
+      font-weight: 600;
+    }
+
+    #so-input-area {
+      padding: 10px 12px;
+      border-top: 1.5px solid #f5edf2;
+      display: flex;
+      gap: 7px;
+      align-items: center;
+      background: #fff;
+      flex-shrink: 0;
+    }
+    #so-input {
+      flex: 1;
+      border: 1.5px solid #edd5e4;
+      border-radius: 20px;
+      padding: 9px 14px;
+      font-size: 13.5px;
+      font-family: 'Nunito', sans-serif;
+      font-weight: 500;
+      outline: none;
+      background: #fdf8fb;
+      color: #1e1b18;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    #so-input::placeholder { color: #c4a0b4; }
+    #so-input:focus {
+      border-color: #e91e78;
+      box-shadow: 0 0 0 3px rgba(233,30,120,0.1);
+      background: #fff;
+    }
+    #so-send {
+      background: #e91e78;
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 37px; height: 37px;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.2s, transform 0.15s;
+      box-shadow: 0 3px 10px rgba(233,30,120,0.35);
+    }
+    #so-send:hover { background: #c9185a; transform: scale(1.07); }
+    #so-send:active { transform: scale(0.96); }
+    #so-send:disabled { background: #e0c8d4; box-shadow: none; cursor: not-allowed; transform: none; }
+  `;
+  document.head.appendChild(style);
+
+  // ── HTML ────────────────────────────────────────────────────────────────
+  document.body.insertAdjacentHTML("beforeend", `
+    <button id="so-chat-bubble" aria-label="Chat with Studio Olive">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M20 2H4C2.9 2 2 2.9 2 4v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 10H6V10h12v2zm0-3H6V7h12v2z"/>
+      </svg>
+    </button>
+
+    <div id="so-chat-window" role="dialog" aria-label="Studio Olive Chat">
+      <div id="so-chat-header">
+        <img id="so-header-logo" src="${RAILWAY_URL}/public/logo.jpg" alt="Studio Olive" />
+        <div>
+          <h2>Studio Olive Assistant</h2>
+          <p><span class="so-status-dot"></span>Here to help you find your magic</p>
+        </div>
+        <button id="so-close-btn" aria-label="Close chat">✕</button>
+      </div>
+      <div id="so-messages">
+        <div class="so-welcome">
+          <span class="so-spark">✨</span>
+          Welcome to Studio Olive! Ask me about our bags, accessories, shipping, returns, or anything else — I'm here to help!
+        </div>
+      </div>
+      <div id="so-input-area">
+        <input id="so-input" type="text" placeholder="Ask a question..." autocomplete="off" />
+        <button id="so-send">&#8593;</button>
+      </div>
+    </div>
+  `);
+
+  // ── Logic ────────────────────────────────────────────────────────────────
+  const bubble   = document.getElementById("so-chat-bubble");
+  const window_  = document.getElementById("so-chat-window");
+  const closeBtn = document.getElementById("so-close-btn");
+  const messages = document.getElementById("so-messages");
+  const input    = document.getElementById("so-input");
+  const sendBtn  = document.getElementById("so-send");
+
+  const history = [];
+
+  bubble.addEventListener("click", () => {
+    window_.classList.toggle("open");
+    if (window_.classList.contains("open")) input.focus();
+  });
+  closeBtn.addEventListener("click", () => window_.classList.remove("open"));
+
+  function linkify(text) {
+    const escaped = text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    const withMd  = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    return withMd.replace(/(?<!\bhref=["'])(?<![">])(https?:\/\/[^\s<)]+)/g,
+      '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+  }
+
+  function appendMsg(role, text) {
+    const div = document.createElement("div");
+    div.className = `so-msg ${role}`;
+    if (role === "assistant" && text) div.innerHTML = linkify(text);
+    else div.textContent = text;
+    messages.appendChild(div);
+    messages.scrollTop = messages.scrollHeight;
+    return div;
+  }
+
+  async function sendMessage() {
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    sendBtn.disabled = true;
+
+    appendMsg("user", text);
+    history.push({ role: "user", content: text });
+
+    const bubble_ = document.createElement("div");
+    bubble_.className = "so-msg assistant";
+    bubble_.innerHTML = `<div class="so-spinner"><div class="so-ring"></div><span class="so-spin-label">Finding that for you…</span></div>`;
+    messages.appendChild(bubble_);
+    messages.scrollTop = messages.scrollHeight;
+
+    try {
+      const res = await fetch(`${RAILWAY_URL}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: history }),
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let full = "";
+      bubble_.innerHTML = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        full += decoder.decode(value, { stream: true });
+        bubble_.innerHTML = linkify(full);
+        messages.scrollTop = messages.scrollHeight;
+      }
+      history.push({ role: "assistant", content: full });
+    } catch (e) {
+      bubble_.textContent = "Sorry, something went wrong. Please try again!";
+    }
+
+    sendBtn.disabled = false;
+    input.focus();
+  }
+
+  sendBtn.addEventListener("click", sendMessage);
+  input.addEventListener("keydown", e => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+})();
+</script>
+<!-- End Studio Olive Chat Widget -->
