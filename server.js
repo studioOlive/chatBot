@@ -242,6 +242,6 @@ app.post("/chat", async (c) => {
 // Start
 // ---------------------------------------------------------------------------
 const PORT = parseInt(process.env.PORT) || 3000;
-serve({ fetch: app.fetch, port: PORT }, () => {
+serve({ fetch: app.fetch, port: PORT, hostname: "0.0.0.0" }, () => {
   console.log(`✅ Studio Olive chat server running at http://localhost:${PORT}`);
 });
