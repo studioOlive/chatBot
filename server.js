@@ -162,80 +162,96 @@ async function sendEscalationEmail(customerQuestion, customerEmail) {
 }
 
 app.post("/chat", async (c) => {
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("❌ OPENAI_API_KEY is not set");
+    return c.text("Service configuration error.", 500);
+  }
+
   const ip = c.req.header("x-forwarded-for")?.split(",")[0].trim() || "unknown";
   if (isRateLimited(ip)) {
     return c.text("Too many requests — please slow down and try again shortly.", 429);
   }
 
+  let body, messages;
   try {
-    const body = await c.req.json();
-    const messages = body?.messages;
-
-    // Input validation
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return c.text("Invalid request.", 400);
-    }
-    if (messages.length > 40) {
-      return c.text("Conversation too long.", 400);
-    }
-    if (!messages.every(m => typeof m.role === "string" && typeof m.content === "string")) {
-      return c.text("Invalid message format.", 400);
-    }
-
-    // Find the real question — skip messages that look like just an email address
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const userMessages = messages.filter(m => m.role === "user");
-    const customerQuestion = [...userMessages].reverse()
-      .find(m => !emailPattern.test(m.content.trim()))?.content
-      || userMessages[userMessages.length - 1]?.content || "";
-
-    const result = streamText({
-      model: openai.chat("gpt-4o-mini"),
-      system: SYSTEM_PROMPT,
-      messages,
-      maxTokens: 400,
-      onFinish: ({ text }) => {
-        const match = text.match(/<<ESCALATE:([^>]*)>>/);
-        if (match) {
-          const customerEmail = match[1].trim();
-          sendEscalationEmail(customerQuestion, customerEmail);
-        }
-      },
-    });
-
-    // Stream response to client, stripping the hidden <<ESCALATE>> tag.
-    // We buffer the tail so a tag split across chunks is always caught.
-    const TAIL = 50; // longer than any possible <<ESCALATE:email@address.com>> tag
-    const decoder = new TextDecoder();
-    const encoder = new TextEncoder();
-    const { readable, writable } = new TransformStream({
-      start(ctrl) { this.buf = ""; },
-      transform(chunk, ctrl) {
-        this.buf += decoder.decode(chunk, { stream: true });
-        // Strip any complete tags
-        this.buf = this.buf.replace(/<<ESCALATE:[^>]*>>/g, "");
-        // Flush everything except the last TAIL chars (may hold a partial tag)
-        if (this.buf.length > TAIL) {
-          ctrl.enqueue(encoder.encode(this.buf.slice(0, -TAIL)));
-          this.buf = this.buf.slice(-TAIL);
-        }
-      },
-      flush(ctrl) {
-        // Strip any partial tag remnant before flushing the rest
-        const remaining = this.buf.replace(/<<ESCALATE:[^>]*/g, "");
-        if (remaining) ctrl.enqueue(encoder.encode(remaining));
-      },
-    });
-
-    result.toTextStreamResponse().body.pipeTo(writable);
-
-    return new Response(readable, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
-  } catch (err) {
-    console.error("❌ Chat error:", err.message);
-    return c.text("Something went wrong. Please try again!", 500);
+    body = await c.req.json();
+    messages = body?.messages;
+  } catch {
+    return c.text("Invalid JSON.", 400);
   }
+
+  // Input validation
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return c.text("Invalid request.", 400);
+  }
+  if (messages.length > 40) {
+    return c.text("Conversation too long.", 400);
+  }
+  if (!messages.every(m => typeof m.role === "string" && typeof m.content === "string")) {
+    return c.text("Invalid message format.", 400);
+  }
+
+  // Find the real question — skip messages that look like just an email address
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const userMessages = messages.filter(m => m.role === "user");
+  const customerQuestion = [...userMessages].reverse()
+    .find(m => !emailPattern.test(m.content.trim()))?.content
+    || userMessages[userMessages.length - 1]?.content || "";
+
+  // Build a ReadableStream we control so we can send errors cleanly
+  // instead of dropping the connection if OpenAI fails.
+  const TAIL = 50;
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  const readable = new ReadableStream({
+    async start(ctrl) {
+      try {
+        const result = streamText({
+          model: openai.chat("gpt-4o-mini"),
+          system: SYSTEM_PROMPT,
+          messages,
+          maxTokens: 400,
+          onFinish: ({ text }) => {
+            const match = text.match(/<<ESCALATE:([^>]*)>>/);
+            if (match) {
+              const customerEmail = match[1].trim();
+              sendEscalationEmail(customerQuestion, customerEmail);
+            }
+          },
+        });
+
+        const reader = result.toTextStreamResponse().body.getReader();
+        let buf = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          // Strip complete <<ESCALATE>> tags
+          buf = buf.replace(/<<ESCALATE:[^>]*>>/g, "");
+          // Flush everything except the buffered tail
+          if (buf.length > TAIL) {
+            ctrl.enqueue(encoder.encode(buf.slice(0, -TAIL)));
+            buf = buf.slice(-TAIL);
+          }
+        }
+        // Flush remaining, stripping any partial tag
+        const remaining = buf.replace(/<<ESCALATE:[^>]*/g, "");
+        if (remaining) ctrl.enqueue(encoder.encode(remaining));
+        ctrl.close();
+      } catch (err) {
+        console.error("❌ Stream error:", err.message);
+        // Send a readable error to the client instead of dropping the connection
+        ctrl.enqueue(encoder.encode("Sorry, something went wrong. Please try again!"));
+        ctrl.close();
+      }
+    },
+  });
+
+  return new Response(readable, {
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
 });
 
 // ---------------------------------------------------------------------------
