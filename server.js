@@ -33,7 +33,7 @@ Products often come in **matching themed sets** — same design across bags, cha
 
 - **US orders** → shopstudioolive.com
 - **International orders** → Etsy shop at https://www.etsy.com/shop/ShopStudioOlive
-- For return/exchange questions, direct customers to contact the team at @ShopStudioOlive on Instagram or via the website
+- For return/exchange questions, direct customers to contact the team at @ShopStudioOlive on Instagram or via email at shopstudioolive@gmail.com
 
 ---
 
